@@ -1,44 +1,37 @@
-#!/usr/bin/env bash
-export SDKMAN_DIR="${HOME}/.sdkman"
-[[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]] && source "${SDKMAN_DIR}/bin/sdkman-init.sh"
+# verify arg length
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <source_directory> <target_file>"
+  exit 1
+fi
 
-############################################
-#
-# Configure the release and commit hash here
-#
-############################################
+# arg 1 is the source directory
+SOURCE_DIR=$1
+# arg 2 is the target file
+TARGET_FILE=$2
 
-# example "788a150f36a6bcd1db672e00d2e7ee609e2842d9"
-COMMIT_HASH=$1
+if [ ! -d "$SOURCE_DIR" ]; then
+  echo "Source directory does not exist: $SOURCE_DIR"
+  exit 1
+fi
 
-# example "https://github.com/OpenIntegrationEngine/engine/releases/download/v4.5.2/oie_unix_4_5_2.tar.gz
-DOWNLOAD_URL=$2
+# make a temp dir to hold the tar contents
+TEMP_DIR=$(mktemp -d)
+if [ ! -d "$TEMP_DIR" ]; then
+  echo "Failed to create temp directory"
+  exit 1
+fi
 
-# cleanup
-rm -rf engine oie temp
-mkdir oie engine temp
+# Cleanup temp directory on exit (success or failure)
+cleanup() {
+  rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
 
-curl -L -o temp/oie.tar.gz "$DOWNLOAD_URL"
-tar xzf temp/oie.tar.gz -C .
+# Copy source directory contents to temp dir
+cp -r "$SOURCE_DIR"/* "$TEMP_DIR"/
+./expand.sh "$TEMP_DIR"
+./normalize.sh "$TEMP_DIR"
+./hash.sh "$TEMP_DIR" > "$TARGET_FILE"
 
-# Clone engine repository at
-git clone --depth=1 --revision="$COMMIT_HASH" git@github.com:OpenIntegrationEngine/engine.git engine
-
-# Get correct groovy
-sdk env install
-
-pushd engine
-
-# Get correct java and ant
-sdk env install
-
-pushd server
-# Build without signing - is faster
-ant clean
-ant -f mirth-build.xml -DdisableSigning=true
-
-# Drop out of dir stack
-popd
-popd
-
-groovy backend.groovy
+# Print the hash of the hash file, but not the filename
+sha256sum "$TARGET_FILE" | awk '{print $1}'
