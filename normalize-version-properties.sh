@@ -14,7 +14,8 @@ fi
 
 find "$directory" -type f -name "version.properties" | while read -r file; do
     sed -i.bak \
-        -e 's/^#.*/# EXCLUDED FROM COMPARISON/' \
+        -e '/^#/d' \
+        -e '/^[[:space:]]*$/d' \
         -e 's/^mirth\.version=.*$/mirth.version=0.0.0 # EXCLUDED FROM COMPARISON/' \
         -e 's/^mirth\.date=.*$/mirth.date=January 1, 2000 # EXCLUDED FROM COMPARISON/' \
         "$file"
